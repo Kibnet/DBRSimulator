@@ -95,6 +95,15 @@ export interface ProdSimState {
 
 /** Calculate buffer penetration for an order given the current day */
 export function getBufferPenetration(order: CustomerOrder, currentDay: number): number {
+  // When dynamic dates are active (releaseDay > 0), measure penetration
+  // relative to releaseDay → dueDay window
+  if (order.releaseDay > 0) {
+    const bufferWindow = order.dueDay - order.releaseDay;
+    if (bufferWindow <= 0) return 100;
+    const consumed = currentDay - order.releaseDay;
+    return Math.min(100, Math.max(0, (consumed / bufferWindow) * 100));
+  }
+  // Fallback: original calculation from createdDay
   if (order.bufferDays <= 0) return 100;
   const consumed = currentDay - order.createdDay;
   return Math.min(100, Math.max(0, (consumed / order.bufferDays) * 100));
