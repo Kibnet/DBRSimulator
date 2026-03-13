@@ -1,6 +1,7 @@
 'use client';
 
 import type { ProdLogEntry } from './types';
+import { formatTime, getSimDay, getSimHour } from './types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollText } from 'lucide-react';
 
@@ -40,8 +41,8 @@ export function ProdEventLog({ log }: { log: ProdLogEntry[] }) {
           ) : (
             log.map((entry) => (
               <div key={entry.id} className="flex gap-2 py-1 border-b border-border/50 last:border-0">
-                <span className="text-[10px] font-mono text-muted-foreground tabular-nums w-6 flex-shrink-0 text-right">
-                  {entry.day}
+                <span className="text-[10px] font-mono text-muted-foreground tabular-nums w-12 flex-shrink-0 text-right">
+                  д{getSimDay(entry.day)} {String(getSimHour(entry.day)).padStart(2, '0')}ч
                 </span>
                 <span className={`text-[11px] leading-relaxed ${typeColors[entry.type]}`}>
                   {entry.message}

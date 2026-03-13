@@ -8,10 +8,9 @@ import { Shield } from 'lucide-react';
 interface BufferStatusProps {
   orders: CustomerOrder[];
   currentDay: number;
-  bufferSize: number;
 }
 
-export function BufferStatus({ orders, currentDay, bufferSize }: BufferStatusProps) {
+export function BufferStatus({ orders, currentDay }: BufferStatusProps) {
   // Only count active orders (not shipped)
   const active = orders.filter((o) => o.status !== 'shipped');
 
@@ -42,9 +41,6 @@ export function BufferStatus({ orders, currentDay, bufferSize }: BufferStatusPro
         <CardTitle className="text-sm font-medium flex items-center gap-2">
           <Shield className="w-4 h-4 text-primary" />
           Защитный буфер
-          <span className="text-[10px] text-muted-foreground font-normal ml-auto">
-            размер: {bufferSize} дн.
-          </span>
         </CardTitle>
       </CardHeader>
       <CardContent className="p-3 pt-0 space-y-3">

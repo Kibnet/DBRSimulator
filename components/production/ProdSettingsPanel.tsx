@@ -229,14 +229,6 @@ export function ProdSettingsPanel({ currentConfig, isRunning, onApply, onClose }
               </div>
               <div className="space-y-2.5 pl-8">
                 <NumField
-                  label="Защитный буфер"
-                  value={config.bufferSize}
-                  onChange={(v) => setConfig((prev) => ({ ...prev, bufferSize: v }))}
-                  min={3}
-                  max={60}
-                  unit="дн."
-                />
-                <NumField
                   label="Лимит WIP (канат)"
                   value={config.ropeWIPLimit}
                   onChange={(v) => setConfig((prev) => ({ ...prev, ropeWIPLimit: v }))}

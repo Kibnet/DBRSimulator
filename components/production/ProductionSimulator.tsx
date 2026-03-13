@@ -17,8 +17,12 @@ import {
   ZONE_COLORS,
   ZONE_BG,
   ZONE_BORDER,
+  HOURS_PER_DAY,
+  formatTime,
+  getSimDay,
+  getSimHour,
 } from './types';
-import type { CustomerOrder, ProdConfig } from './types';
+import type { CustomerOrder, ProdConfig, Machine } from './types';
 import {
   Play,
   Pause,
@@ -40,12 +44,19 @@ import Link from 'next/link';
 const OP_NAMES: Record<number, string> = { 1: 'Заготовка', 2: 'Обработка', 3: 'Сборка' };
 
 export function ProductionSimulator() {
-  const { state, toggleRunning, reset, setSpeed, config, toggleRope, toggleDynamicDueDates } = useProductionSim();
+  const {
+    state, toggleRunning, reset, applyConfig, setSpeed, config,
+    toggleRope, toggleDynamicDueDates,
+    updateMachineCapacity, updateConfigValue, updateOrderGen,
+  } = useProductionSim();
   const [showSettings, setShowSettings] = useState(false);
+  const [speedInput, setSpeedInput] = useState('10');
+  const [editingWIP, setEditingWIP] = useState(false);
+  const [wipValue, setWipValue] = useState(String(config.ropeWIPLimit));
   const { day, orders, machines, stats, log } = state;
 
   const handleApplyConfig = (newConfig: ProdConfig) => {
-    reset(newConfig);
+    applyConfig(newConfig);
     setShowSettings(false);
   };
 
@@ -78,13 +89,6 @@ export function ProductionSimulator() {
       ? ((stats.shippedOnTime / stats.totalShipped) * 100).toFixed(1)
       : '100.0';
 
-  const speeds = [
-    { label: '0.5×', value: 1600 },
-    { label: '1×', value: 800 },
-    { label: '2×', value: 400 },
-    { label: '5×', value: 160 },
-  ];
-
   return (
     <div className="min-h-screen bg-background bg-dot-grid">
       <div className="max-w-[1400px] mx-auto px-4 py-6 md:px-6 lg:px-8">
@@ -109,26 +113,30 @@ export function ProductionSimulator() {
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2 bg-secondary rounded-lg px-4 py-2.5">
-              <span className="text-muted-foreground text-[10px] uppercase tracking-widest">День</span>
-              <span className="text-foreground font-mono text-xl font-bold tabular-nums min-w-[3ch] text-right">
-                {day}
+              <span className="text-muted-foreground text-[10px] uppercase tracking-widest">Время</span>
+              <span className="text-foreground font-mono text-lg font-bold tabular-nums min-w-[6ch] text-right">
+                д{getSimDay(day)} {String(getSimHour(day)).padStart(2, '0')}:00
               </span>
+              <span className="text-muted-foreground text-[10px] font-mono">({day}ч)</span>
             </div>
 
-            <div className="flex items-center rounded-lg overflow-hidden border border-border">
-              {speeds.map((s) => (
-                <button
-                  key={s.value}
-                  onClick={() => setSpeed(s.value)}
-                  className={`px-3 py-2 text-xs font-medium transition-colors ${
-                    state.speed === s.value
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary text-secondary-foreground hover:bg-accent'
-                  }`}
-                >
-                  {s.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-2 bg-secondary rounded-lg px-3 py-2">
+              <span className="text-muted-foreground text-[10px] uppercase tracking-widest">Скорость</span>
+              <input
+                type="number"
+                min={1}
+                max={2000}
+                value={speedInput}
+                onChange={(e) => {
+                  setSpeedInput(e.target.value);
+                  const v = parseInt(e.target.value);
+                  if (!isNaN(v) && v >= 1) {
+                    setSpeed(Math.max(1, Math.round(1000 / v)));
+                  }
+                }}
+                className="w-16 h-7 rounded-md border border-input bg-background px-2 text-sm font-mono text-foreground text-center tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
+              />
+              <span className="text-muted-foreground text-[10px]">ч/сек</span>
             </div>
 
             <Button
@@ -163,9 +171,43 @@ export function ProductionSimulator() {
               <Link2 className="w-3.5 h-3.5" />
               Канат {config.ropeEnabled ? 'ВКЛ' : 'ВЫКЛ'}
               {config.ropeEnabled && (
-                <span className="text-[10px] opacity-70">
-                  (WIP≤{config.ropeWIPLimit})
-                </span>
+                editingWIP ? (
+                  <input
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={wipValue}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => setWipValue(e.target.value)}
+                    onBlur={() => {
+                      const v = parseInt(wipValue);
+                      if (!isNaN(v) && v >= 1 && v <= 20) updateConfigValue('ropeWIPLimit', v);
+                      setEditingWIP(false);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const v = parseInt(wipValue);
+                        if (!isNaN(v) && v >= 1 && v <= 20) updateConfigValue('ropeWIPLimit', v);
+                        setEditingWIP(false);
+                      }
+                      if (e.key === 'Escape') setEditingWIP(false);
+                    }}
+                    autoFocus
+                    className="w-8 h-4 rounded border border-primary/50 bg-background px-0.5 text-[10px] font-mono text-foreground text-center tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                ) : (
+                  <span
+                    className="text-[10px] opacity-70 hover:opacity-100 hover:bg-primary/20 rounded px-1 cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setWipValue(String(config.ropeWIPLimit));
+                      setEditingWIP(true);
+                    }}
+                    title="Нажмите для редактирования"
+                  >
+                    (WIP≤{config.ropeWIPLimit})
+                  </span>
+                )
               )}
             </button>
 
@@ -207,6 +249,7 @@ export function ProductionSimulator() {
               orders={orders}
               currentDay={day}
               isDrum={false}
+              onCapacityChange={updateMachineCapacity}
             />
 
             <WIPColumn label="П/ф 1" orders={wip1} currentDay={day} />
@@ -219,6 +262,7 @@ export function ProductionSimulator() {
               orders={orders}
               currentDay={day}
               isDrum={true}
+              onCapacityChange={updateMachineCapacity}
             />
 
             <WIPColumn label="П/ф 2" orders={wip2} currentDay={day} />
@@ -231,6 +275,7 @@ export function ProductionSimulator() {
               orders={orders}
               currentDay={day}
               isDrum={false}
+              onCapacityChange={updateMachineCapacity}
             />
 
             <PipelineArrow />
@@ -276,7 +321,6 @@ export function ProductionSimulator() {
           <BufferStatus
             orders={orders}
             currentDay={day}
-            bufferSize={config.bufferSize}
           />
         </section>
 
@@ -394,17 +438,19 @@ function OperationColumn({
   orders,
   currentDay,
   isDrum,
+  onCapacityChange,
 }: {
   opId: number;
   name: string;
-  machines: typeof import('./types').DEFAULT_MACHINES;
+  machines: Machine[];
   orders: CustomerOrder[];
   currentDay: number;
   isDrum: boolean;
+  onCapacityChange?: (machineId: string, capacity: number) => void;
 }) {
-  const totalIdleDays = machines.reduce((s, m) => s + m.idleDays, 0);
+  const totalIdleHours = machines.reduce((s, m) => s + m.idleHours, 0);
   const avgBusyPct = currentDay > 0
-    ? ((currentDay * machines.length - totalIdleDays) / (currentDay * machines.length)) * 100
+    ? ((currentDay * machines.length - totalIdleHours) / (currentDay * machines.length)) * 100
     : 0;
 
   return (
@@ -448,6 +494,7 @@ function OperationColumn({
                 machine={machine}
                 order={order}
                 currentDay={currentDay}
+                onCapacityChange={onCapacityChange}
               />
             );
           })}

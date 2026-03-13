@@ -1,7 +1,7 @@
 'use client';
 
 import type { CustomerOrder, Machine } from './types';
-import { getOrderZone, ZONE_COLORS, ZONE_BG, ZONE_BORDER } from './types';
+import { getOrderZone, ZONE_COLORS, ZONE_BG, ZONE_BORDER, HOURS_PER_DAY, formatTime, getSimDay } from './types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar } from 'lucide-react';
 
@@ -14,13 +14,26 @@ interface GanttChartProps {
 
 export function GanttChart({ currentDay, machines, orders, daysToShow = 20 }: GanttChartProps) {
   const drumMachines = machines.filter((m) => m.operationId === 2);
-  const startDay = currentDay;
-  const endDay = currentDay + daysToShow;
-  const days = Array.from({ length: daysToShow }, (_, i) => startDay + i);
+  const hoursToShow = daysToShow * HOURS_PER_DAY;
+  const startHour = currentDay;
+  const endHour = currentDay + hoursToShow;
+
+  // Day labels: show day numbers at day boundaries
+  const startDayNum = getSimDay(currentDay);
+  const dayLabels: { dayNum: number; offsetPct: number }[] = [];
+  for (let d = 0; d <= daysToShow; d++) {
+    const hourOfDayStart = d * HOURS_PER_DAY - (currentDay % HOURS_PER_DAY);
+    if (hourOfDayStart >= 0 && hourOfDayStart < hoursToShow) {
+      dayLabels.push({
+        dayNum: startDayNum + d,
+        offsetPct: (hourOfDayStart / hoursToShow) * 100,
+      });
+    }
+  }
 
   // Build drum schedule: current order + estimated queue
   const drumSchedule = drumMachines.map((machine) => {
-    const bars: { order: CustomerOrder; startDay: number; endDay: number }[] = [];
+    const bars: { order: CustomerOrder; startHour: number; endHour: number }[] = [];
     const currentOrder = machine.currentOrderId
       ? orders.find((o) => o.id === machine.currentOrderId)
       : null;
@@ -28,8 +41,8 @@ export function GanttChart({ currentDay, machines, orders, daysToShow = 20 }: Ga
     if (currentOrder && currentOrder.processingRemaining > 0) {
       bars.push({
         order: currentOrder,
-        startDay: currentDay,
-        endDay: currentDay + currentOrder.processingRemaining,
+        startHour: currentDay,
+        endHour: currentDay + currentOrder.processingRemaining,
       });
     }
 
@@ -37,19 +50,19 @@ export function GanttChart({ currentDay, machines, orders, daysToShow = 20 }: Ga
     const wip1Orders = orders
       .filter((o) => o.status === 'wip1')
       .sort((a, b) => {
-        const pA = (currentDay - a.createdDay) / a.bufferDays;
-        const pB = (currentDay - b.createdDay) / b.bufferDays;
+        const pA = (currentDay - a.createdDay) / (a.bufferHours || 1);
+        const pB = (currentDay - b.createdDay) / (b.bufferHours || 1);
         return pB - pA;
       });
 
-    let nextStart = bars.length > 0 ? bars[bars.length - 1].endDay : currentDay;
+    let nextStart = bars.length > 0 ? bars[bars.length - 1].endHour : currentDay;
     // Distribute wip1 orders round-robin across drum machines roughly
     const machineIdx = drumMachines.indexOf(machine);
     for (let i = machineIdx; i < wip1Orders.length; i += drumMachines.length) {
       const o = wip1Orders[i];
-      const dur = Math.max(1, Math.ceil(o.quantity / machine.capacity));
-      if (nextStart >= endDay) break;
-      bars.push({ order: o, startDay: nextStart, endDay: nextStart + dur });
+      const dur = Math.max(1, Math.ceil((o.quantity * HOURS_PER_DAY) / machine.capacity));
+      if (nextStart >= endHour) break;
+      bars.push({ order: o, startHour: nextStart, endHour: nextStart + dur });
       nextStart += dur;
     }
 
@@ -58,17 +71,16 @@ export function GanttChart({ currentDay, machines, orders, daysToShow = 20 }: Ga
 
   // Shipment deadlines: all active non-shipped orders
   const shipments = orders
-    .filter((o) => o.status !== 'shipped' && o.dueDay >= startDay && o.dueDay <= endDay)
+    .filter((o) => o.status !== 'shipped' && o.dueDay >= startHour && o.dueDay <= endHour)
     .sort((a, b) => a.dueDay - b.dueDay);
 
   // Group shipments by day
   const shipmentsByDay: Record<number, CustomerOrder[]> = {};
   for (const o of shipments) {
-    if (!shipmentsByDay[o.dueDay]) shipmentsByDay[o.dueDay] = [];
-    shipmentsByDay[o.dueDay].push(o);
+    const dayNum = getSimDay(o.dueDay);
+    if (!shipmentsByDay[dayNum]) shipmentsByDay[dayNum] = [];
+    shipmentsByDay[dayNum].push(o);
   }
-
-  const cellWidth = 100 / daysToShow;
 
   return (
     <Card>
@@ -84,20 +96,20 @@ export function GanttChart({ currentDay, machines, orders, daysToShow = 20 }: Ga
             {/* Day headers */}
             <div className="flex border-b border-border mb-1">
               <div className="w-24 flex-shrink-0" />
-              <div className="flex-1 flex">
-                {days.map((d) => (
+              <div className="flex-1 relative h-6">
+                {dayLabels.map(({ dayNum, offsetPct }) => (
                   <div
-                    key={d}
-                    className={`text-center text-[9px] font-mono tabular-nums py-1 ${
-                      d === currentDay
+                    key={dayNum}
+                    className={`absolute text-center text-[9px] font-mono tabular-nums py-1 ${
+                      dayNum === getSimDay(currentDay)
                         ? 'text-primary font-bold'
-                        : d % 5 === 0
+                        : dayNum % 5 === 0
                         ? 'text-secondary-foreground'
                         : 'text-muted-foreground/50'
                     }`}
-                    style={{ width: `${cellWidth}%` }}
+                    style={{ left: `${offsetPct}%`, transform: 'translateX(-50%)' }}
                   >
-                    {d}
+                    д{dayNum}
                   </div>
                 ))}
               </div>
@@ -120,11 +132,19 @@ export function GanttChart({ currentDay, machines, orders, daysToShow = 20 }: Ga
                     className="absolute top-0 bottom-0 w-px bg-primary/40 z-10"
                     style={{ left: '0%' }}
                   />
-                  {bars.map(({ order, startDay: bs, endDay: be }) => {
-                    const left = Math.max(0, ((bs - startDay) / daysToShow) * 100);
+                  {/* Day grid lines */}
+                  {dayLabels.map(({ dayNum, offsetPct }) => (
+                    <div
+                      key={dayNum}
+                      className="absolute top-0 bottom-0 w-px bg-border/30"
+                      style={{ left: `${offsetPct}%` }}
+                    />
+                  ))}
+                  {bars.map(({ order, startHour: bs, endHour: be }) => {
+                    const left = Math.max(0, ((bs - startHour) / hoursToShow) * 100);
                     const width = Math.min(
                       100 - left,
-                      ((be - bs) / daysToShow) * 100
+                      ((be - bs) / hoursToShow) * 100
                     );
                     if (width <= 0) return null;
                     const zone = getOrderZone(order, currentDay);
@@ -138,7 +158,7 @@ export function GanttChart({ currentDay, machines, orders, daysToShow = 20 }: Ga
                           background: ZONE_BG[zone],
                           borderColor: ZONE_BORDER[zone],
                         }}
-                        title={`${order.number}: ${order.quantity} ед., отгрузка день ${order.dueDay}`}
+                        title={`${order.number}: ${order.quantity} ед., отгрузка ${formatTime(order.dueDay)}`}
                       >
                         <span
                           className="text-[8px] font-mono font-bold truncate px-0.5"
@@ -159,10 +179,21 @@ export function GanttChart({ currentDay, machines, orders, daysToShow = 20 }: Ga
                 <span className="text-[10px] text-secondary-foreground">Отгрузки</span>
               </div>
               <div className="flex-1 relative h-6">
-                {days.map((d) => {
-                  const dayShipments = shipmentsByDay[d];
-                  if (!dayShipments) return null;
-                  const left = ((d - startDay) / daysToShow) * 100;
+                {/* Day grid lines */}
+                {dayLabels.map(({ dayNum, offsetPct }) => (
+                  <div
+                    key={dayNum}
+                    className="absolute top-0 bottom-0 w-px bg-border/30"
+                    style={{ left: `${offsetPct}%` }}
+                  />
+                ))}
+                {Object.entries(shipmentsByDay).map(([dayNumStr, dayShipments]) => {
+                  const dayNum = parseInt(dayNumStr);
+                  // Position at the center of the day
+                  const dayStartHour = (dayNum - 1) * HOURS_PER_DAY;
+                  const dayCenterHour = dayStartHour + HOURS_PER_DAY / 2;
+                  const left = ((dayCenterHour - startHour) / hoursToShow) * 100;
+                  if (left < 0 || left > 100) return null;
                   // Show the highest-priority (most penetrated) zone color
                   const worstZone = dayShipments.reduce((worst, o) => {
                     const z = getOrderZone(o, currentDay);
@@ -172,7 +203,7 @@ export function GanttChart({ currentDay, machines, orders, daysToShow = 20 }: Ga
 
                   return (
                     <div
-                      key={d}
+                      key={dayNum}
                       className="absolute top-0 flex flex-col items-center"
                       style={{ left: `${left}%` }}
                       title={dayShipments.map((o) => `${o.number} (${o.quantity} ед.)`).join(', ')}

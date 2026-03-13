@@ -1,7 +1,7 @@
 'use client';
 
 import type { CustomerOrder, BufferZone } from './types';
-import { getBufferPenetration, getOrderZone, ZONE_COLORS, ZONE_BG, ZONE_BORDER } from './types';
+import { getBufferPenetration, getOrderZone, ZONE_COLORS, ZONE_BG, ZONE_BORDER, formatTime, HOURS_PER_DAY } from './types';
 
 interface OrderBadgeProps {
   order: CustomerOrder;
@@ -12,7 +12,7 @@ interface OrderBadgeProps {
 export function OrderBadge({ order, currentDay, compact = false }: OrderBadgeProps) {
   const penetration = getBufferPenetration(order, currentDay);
   const zone = getOrderZone(order, currentDay);
-  const daysLeft = order.dueDay - currentDay;
+  const hoursLeft = order.dueDay - currentDay;
 
   if (compact) {
     return (
@@ -26,9 +26,9 @@ export function OrderBadge({ order, currentDay, compact = false }: OrderBadgePro
       >
         <span>{order.number}</span>
         <span className="opacity-60">{order.quantity}ед</span>
-        <span className="opacity-50">→д{order.dueDay}</span>
+        <span className="opacity-50">→{formatTime(order.dueDay)}</span>
         {order.releaseDay > 0 && order.status === 'queued' && (
-          <span className="opacity-40">🚀д{order.releaseDay}</span>
+          <span className="opacity-40">🚀{formatTime(order.releaseDay)}</span>
         )}
       </div>
     );
@@ -57,19 +57,19 @@ export function OrderBadge({ order, currentDay, compact = false }: OrderBadgePro
           {order.quantity} ед.
         </span>
         <span className="text-muted-foreground font-mono">
-          отгрузка: день {order.dueDay}
+          отгрузка: {formatTime(order.dueDay)}
         </span>
       </div>
 
       <div className="flex items-center justify-between text-[10px] mt-0.5">
         <span className="text-muted-foreground/70">
-          создан: день {order.createdDay}
+          создан: {formatTime(order.createdDay)}
         </span>
         <span
           className="font-mono font-medium"
-          style={{ color: daysLeft < 0 ? ZONE_COLORS.red : 'hsl(var(--muted-foreground))' }}
+          style={{ color: hoursLeft < 0 ? ZONE_COLORS.red : 'hsl(var(--muted-foreground))' }}
         >
-          {daysLeft >= 0 ? `осталось ${daysLeft} дн.` : `просрочен ${-daysLeft} дн.`}
+          {hoursLeft >= 0 ? `осталось ${formatTime(hoursLeft)}` : `просрочен ${formatTime(-hoursLeft)}`}
         </span>
       </div>
 
@@ -77,11 +77,11 @@ export function OrderBadge({ order, currentDay, compact = false }: OrderBadgePro
       {order.drumSlotStart > 0 && (
         <div className="flex items-center justify-between text-[10px] mt-0.5">
           <span className="text-muted-foreground/70 font-mono">
-            барабан: день {order.drumSlotStart}
+            барабан: {formatTime(order.drumSlotStart)}
           </span>
           {order.releaseDay > 0 && order.status === 'queued' && (
             <span className="font-mono font-medium" style={{ color: currentDay >= order.releaseDay ? ZONE_COLORS.green : 'hsl(var(--muted-foreground) / 0.5)' }}>
-              запуск: день {order.releaseDay}
+              запуск: {formatTime(order.releaseDay)}
             </span>
           )}
         </div>
@@ -100,7 +100,7 @@ export function OrderBadge({ order, currentDay, compact = false }: OrderBadgePro
             />
           </div>
           <span className="text-[9px] text-muted-foreground mt-0.5 block">
-            осталось {order.processingRemaining} дн.
+            осталось {formatTime(order.processingRemaining)}
           </span>
         </div>
       )}

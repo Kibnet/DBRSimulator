@@ -13,8 +13,8 @@ export interface CustomerOrder {
   createdDay: number;
   /** Day the order must ship */
   dueDay: number;
-  /** Total buffer in days = dueDay - createdDay */
-  bufferDays: number;
+  /** Total buffer in hours = dueDay - createdDay */
+  bufferHours: number;
   /** Current stage of the order */
   status:
     | 'queued'     // waiting to be released to production
@@ -31,8 +31,6 @@ export interface CustomerOrder {
   processingRemaining: number;
   /** Total days needed for current operation */
   processingTotal: number;
-  /** Quantity already produced (units flowing through) */
-  quantityCompleted: number;
   /** Planned drum slot start day (0 = not scheduled) */
   drumSlotStart: number;
   /** Planned drum machine ID */
@@ -47,19 +45,12 @@ export interface Machine {
   name: string;
   /** Which operation stage: 1, 2, or 3 */
   operationId: number;
-  /** Units this machine can produce per day */
+  /** Units this machine can produce per day (24h continuous) */
   capacity: number;
   /** Order currently being processed (null if idle) */
   currentOrderId: string | null;
-  /** Total days this machine has been idle */
-  idleDays: number;
-}
-
-/** Production operation stage */
-export interface OperationStage {
-  id: number;
-  name: string;
-  machines: Machine[];
+  /** Total hours this machine has been idle */
+  idleHours: number;
 }
 
 /** Log entry */
@@ -80,6 +71,7 @@ export interface ProdStats {
 
 /** Full simulation state */
 export interface ProdSimState {
+  /** Current simulation hour (1 tick = 1 hour) */
   day: number;
   isRunning: boolean;
   speed: number;
@@ -104,9 +96,9 @@ export function getBufferPenetration(order: CustomerOrder, currentDay: number): 
     return Math.min(100, Math.max(0, (consumed / bufferWindow) * 100));
   }
   // Fallback: original calculation from createdDay
-  if (order.bufferDays <= 0) return 100;
+  if (order.bufferHours <= 0) return 100;
   const consumed = currentDay - order.createdDay;
-  return Math.min(100, Math.max(0, (consumed / order.bufferDays) * 100));
+  return Math.min(100, Math.max(0, (consumed / order.bufferHours) * 100));
 }
 
 /** Get zone from buffer penetration % */
@@ -161,27 +153,30 @@ export function getZoneLabel(zone: BufferZone): string {
   }
 }
 
-/* ── Default machine configuration ── */
+/* ── Hourly simulation helpers ── */
 
-export const DEFAULT_MACHINES: Machine[] = [
-  // Op 1 — Заготовка (3 machines)
-  { id: 'op1-m1', name: 'Станок 1А', operationId: 1, capacity: 12, currentOrderId: null, idleDays: 0 },
-  { id: 'op1-m2', name: 'Станок 1Б', operationId: 1, capacity: 10, currentOrderId: null, idleDays: 0 },
-  { id: 'op1-m3', name: 'Станок 1В', operationId: 1, capacity: 8, currentOrderId: null, idleDays: 0 },
-  // Op 2 — Обработка (2 machines) — THE DRUM / constraint
-  { id: 'op2-m1', name: 'Станок 2А', operationId: 2, capacity: 8, currentOrderId: null, idleDays: 0 },
-  { id: 'op2-m2', name: 'Станок 2Б', operationId: 2, capacity: 6, currentOrderId: null, idleDays: 0 },
-  // Op 3 — Сборка (3 machines)
-  { id: 'op3-m1', name: 'Станок 3А', operationId: 3, capacity: 10, currentOrderId: null, idleDays: 0 },
-  { id: 'op3-m2', name: 'Станок 3Б', operationId: 3, capacity: 8, currentOrderId: null, idleDays: 0 },
-  { id: 'op3-m3', name: 'Станок 3В', operationId: 3, capacity: 6, currentOrderId: null, idleDays: 0 },
-];
+export const HOURS_PER_DAY = 24;
 
-export const OPERATIONS: OperationStage[] = [
-  { id: 1, name: 'Заготовка', machines: DEFAULT_MACHINES.filter((m) => m.operationId === 1) },
-  { id: 2, name: 'Обработка', machines: DEFAULT_MACHINES.filter((m) => m.operationId === 2) },
-  { id: 3, name: 'Сборка', machines: DEFAULT_MACHINES.filter((m) => m.operationId === 3) },
-];
+/** Format hours into human-readable "Xд Yч" format */
+export function formatTime(hours: number): string {
+  const h = Math.round(hours);
+  if (h < 0) return '0ч';
+  if (h < HOURS_PER_DAY) return `${h}ч`;
+  const days = Math.floor(h / HOURS_PER_DAY);
+  const rem = h % HOURS_PER_DAY;
+  if (rem === 0) return `${days}д`;
+  return `${days}д ${rem}ч`;
+}
+
+/** Get simulation day number (1-based) from total hours */
+export function getSimDay(totalHours: number): number {
+  return Math.floor(totalHours / HOURS_PER_DAY) + 1;
+}
+
+/** Get hour within current day (0-23) */
+export function getSimHour(totalHours: number): number {
+  return totalHours % HOURS_PER_DAY;
+}
 
 /* ── Editable Configuration ── */
 
@@ -211,8 +206,6 @@ export interface OrderGenConfig {
 export interface ProdConfig {
   operations: [OperationConfig, OperationConfig, OperationConfig];
   orderGen: OrderGenConfig;
-  /** Protective buffer size in days (planned lead time through all ops) */
-  bufferSize: number;
   /** Rope: limit WIP before drum */
   ropeEnabled: boolean;
   /** Max orders allowed in queue + op1 + wip1 when rope is on */
@@ -254,7 +247,6 @@ export const DEFAULT_PROD_CONFIG: ProdConfig = {
     bufferMin: 12,
     bufferMax: 25,
   },
-  bufferSize: 15,
   ropeEnabled: false,
   ropeWIPLimit: 4,
   dynamicDueDates: false,
@@ -272,7 +264,7 @@ export function buildMachinesFromConfig(config: ProdConfig): Machine[] {
         operationId: opId,
         capacity: mc.capacity,
         currentOrderId: null,
-        idleDays: 0,
+        idleHours: 0,
       });
     });
   });
@@ -326,7 +318,6 @@ export const PROD_PROFILES: ProdProfile[] = [
         },
       ],
       orderGen: { ordersPerDay: 1.5, qtyMin: 15, qtyMax: 60, bufferMin: 12, bufferMax: 22 },
-      bufferSize: 18,
       ropeEnabled: false,
       ropeWIPLimit: 4,
       dynamicDueDates: false,
@@ -339,7 +330,6 @@ export const PROD_PROFILES: ProdProfile[] = [
     config: {
       operations: DEFAULT_PROD_CONFIG.operations,
       orderGen: { ordersPerDay: 2.0, qtyMin: 20, qtyMax: 60, bufferMin: 8, bufferMax: 16 },
-      bufferSize: 10,
       ropeEnabled: false,
       ropeWIPLimit: 5,
       dynamicDueDates: false,
@@ -352,7 +342,6 @@ export const PROD_PROFILES: ProdProfile[] = [
     config: {
       operations: DEFAULT_PROD_CONFIG.operations,
       orderGen: { ordersPerDay: 1.5, qtyMin: 10, qtyMax: 50, bufferMin: 12, bufferMax: 25 },
-      bufferSize: 15,
       ropeEnabled: true,
       ropeWIPLimit: 3,
       dynamicDueDates: false,
