@@ -199,7 +199,7 @@ export function useProductionSim() {
         // Financial: spent on raw materials
         const rawCost = qty * cfg.unitCostRaw;
         stats.totalSpent += rawCost;
-        financialEvents.push({ hour: newHour, spent: rawCost, earned: 0 });
+        financialEvents.push({ hour: newHour, spent: rawCost, earned: 0, penalty: 0 });
 
         const logMsg = cfg.dynamicDueDates
           ? `📋 Новый заказ ${order.number}: ${qty} ед., барабан ${formatTime(drumSlotStart)}, запуск ${formatTime(releaseDay)}, отгрузка ${formatTime(order.dueDay)}`
@@ -420,7 +420,7 @@ export function useProductionSim() {
               type: 'ship',
             });
           }
-          financialEvents.push({ hour: newHour, spent: 0, earned: revenue - lateLoss });
+          financialEvents.push({ hour: newHour, spent: 0, earned: revenue, penalty: lateLoss });
         }
       }
 

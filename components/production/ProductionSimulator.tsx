@@ -110,9 +110,9 @@ export function ProductionSimulator() {
   const windowHours = 30 * HOURS_PER_DAY;
   const recentEvents = financialEvents.filter((e) => day - e.hour <= windowHours);
   const last30Spent = recentEvents.reduce((s, e) => s + e.spent, 0);
-  const last30Earned = recentEvents.reduce((s, e) => s + e.earned, 0);
+  const last30NetEarned = recentEvents.reduce((s, e) => s + (e.earned - e.penalty), 0);
   const daysElapsed = Math.max(1, Math.min(30, day / HOURS_PER_DAY));
-  const profitRatePerDay = Math.round((last30Earned - last30Spent) / daysElapsed);
+  const profitRatePerDay = Math.round((last30NetEarned - last30Spent) / daysElapsed);
 
   return (
     <div className="min-h-screen bg-background bg-dot-grid">
@@ -396,7 +396,7 @@ export function ProductionSimulator() {
                 <StatRow label="Заработано (всего)" value={formatMoney(stats.totalEarned)} primary={stats.totalEarned > 0} />
                 <div className="border-t border-border my-1" />
                 <StatRow label="Потрачено (30д)" value={formatMoney(last30Spent)} danger />
-                <StatRow label="Заработано (30д)" value={formatMoney(last30Earned)} primary={last30Earned > 0} />
+                <StatRow label="Заработано (30д)" value={formatMoney(last30NetEarned)} primary={last30NetEarned > 0} />
                 <StatRow
                   label="Прибыль/день (30д)"
                   value={`${profitRatePerDay >= 0 ? '+' : ''}${formatMoney(profitRatePerDay)}`}

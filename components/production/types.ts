@@ -85,7 +85,8 @@ export interface ProdStats {
 export interface FinancialEvent {
   hour: number;
   spent: number;
-  earned: number;
+  earned: number;   // gross revenue (before penalty)
+  penalty: number;  // late penalty amount
 }
 
 /** Full simulation state */
