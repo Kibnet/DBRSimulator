@@ -5,8 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin', 'cyrillic'] })
 
 export const metadata: Metadata = {
-  title: 'ББК Симулятор — Барабан-Буфер-Канат',
-  description: 'Интерактивный симулятор управления запасами по методике Барабан-Буфер-Канат из теории ограничений (TOC)',
+  title: 'ББК · Производство — Барабан-Буфер-Канат',
+  description: 'Симулятор управления производственными заказами по методике ББК с буфером времени и приоритизацией',
 }
 
 export default function RootLayout({

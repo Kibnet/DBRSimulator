@@ -42,7 +42,6 @@ import {
   DollarSign,
   Banknote,
 } from 'lucide-react';
-import Link from 'next/link';
 
 const OP_NAMES: Record<number, string> = { 1: 'Заготовка', 2: 'Обработка', 3: 'Сборка' };
 
@@ -125,12 +124,6 @@ export function ProductionSimulator() {
               <h1 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">
                 ББК · Производство
               </h1>
-              <Link
-                href="/"
-                className="text-[10px] text-primary bg-primary/10 border border-primary/20 rounded-full px-2.5 py-1 hover:bg-primary/20 transition-colors"
-              >
-                Цепочка поставок →
-              </Link>
             </div>
             <p className="text-muted-foreground text-sm">
               Управление производственными заказами · Буфер времени · Приоритет по проникновению
