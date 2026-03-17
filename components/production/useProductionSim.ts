@@ -400,9 +400,11 @@ export function useProductionSim() {
           stats.totalEarned += revenue;
           let lateLoss = 0;
           if (wasLate) {
-            // Late penalty: 1% of revenue per hour late
+            // Late penalty: 1% of revenue per hour late, capped at order margin
             const hoursLate = newHour - order.dueDay;
-            lateLoss = Math.round(revenue * 0.01 * hoursLate);
+            const rawPenalty = Math.round(revenue * 0.01 * hoursLate);
+            const margin = revenue - (order.quantity * cfg.unitCostRaw);
+            lateLoss = Math.min(Math.max(0, margin), rawPenalty);
             stats.totalLateLoss += lateLoss;
             stats.shippedLate++;
             newLog.push({
