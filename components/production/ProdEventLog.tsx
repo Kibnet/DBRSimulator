@@ -12,6 +12,8 @@ const typeIcons: Record<ProdLogEntry['type'], string> = {
   ship: '📦',
   warning: '⚠',
   info: '⚙',
+  breakdown: '⚠️',
+  repair: '🔧',
 };
 
 const typeColors: Record<ProdLogEntry['type'], string> = {
@@ -21,6 +23,8 @@ const typeColors: Record<ProdLogEntry['type'], string> = {
   ship: 'text-primary',
   warning: 'text-destructive',
   info: 'text-muted-foreground',
+  breakdown: 'text-destructive',
+  repair: 'text-[hsl(142_71%_45%)]',
 };
 
 export function ProdEventLog({ log }: { log: ProdLogEntry[] }) {

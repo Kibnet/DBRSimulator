@@ -55,6 +55,10 @@ export interface Machine {
   currentOrderId: string | null;
   /** Total hours this machine has been idle */
   idleHours: number;
+  /** Whether the machine is currently broken down */
+  isBrokenDown: boolean;
+  /** Hours remaining until repair is complete */
+  breakdownRemainingHours: number;
 }
 
 /** Log entry */
@@ -62,7 +66,7 @@ export interface ProdLogEntry {
   id: string;
   day: number;
   message: string;
-  type: 'order' | 'release' | 'complete' | 'ship' | 'warning' | 'info';
+  type: 'order' | 'release' | 'complete' | 'ship' | 'warning' | 'info' | 'breakdown' | 'repair';
 }
 
 /** Statistics */
@@ -319,6 +323,8 @@ export interface ProdConfig {
   unitPriceSell: number;
   /** Processing time variability (0 = none, 0.3 = 30% std dev) */
   processingVariability: number;
+  /** Machine availability percentage (0.8 to 1.0, where 1.0 = 100% uptime) */
+  machineAvailability: number;
 }
 
 export const DEFAULT_PROD_CONFIG: ProdConfig = {
@@ -360,6 +366,7 @@ export const DEFAULT_PROD_CONFIG: ProdConfig = {
   unitCostRaw: 100,
   unitPriceSell: 300,
   processingVariability: 0,
+  machineAvailability: 1.0,
 };
 
 /** Build Machine[] from ProdConfig */
@@ -375,6 +382,8 @@ export function buildMachinesFromConfig(config: ProdConfig): Machine[] {
         capacity: mc.capacity,
         currentOrderId: null,
         idleHours: 0,
+        isBrokenDown: false,
+        breakdownRemainingHours: 0,
       });
     });
   });
@@ -434,6 +443,7 @@ export const PROD_PROFILES: ProdProfile[] = [
       unitCostRaw: 100,
       unitPriceSell: 300,
       processingVariability: 0,
+      machineAvailability: 1.0,
     },
   },
   {
@@ -449,6 +459,7 @@ export const PROD_PROFILES: ProdProfile[] = [
       unitCostRaw: 100,
       unitPriceSell: 300,
       processingVariability: 0,
+      machineAvailability: 1.0,
     },
   },
   {
@@ -464,6 +475,7 @@ export const PROD_PROFILES: ProdProfile[] = [
       unitCostRaw: 100,
       unitPriceSell: 300,
       processingVariability: 0,
+      machineAvailability: 1.0,
     },
   },
 ];

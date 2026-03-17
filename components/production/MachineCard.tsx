@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Machine, CustomerOrder } from './types';
 import { getOrderZone, ZONE_COLORS, ZONE_BG, ZONE_BORDER, formatTime } from './types';
-import { Cog } from 'lucide-react';
+import { Cog, Wrench } from 'lucide-react';
 
 interface MachineCardProps {
   machine: Machine;
@@ -14,6 +14,7 @@ interface MachineCardProps {
 
 export function MachineCard({ machine, order, currentDay, onCapacityChange }: MachineCardProps) {
   const isIdle = !order;
+  const isBrokenDown = machine.isBrokenDown;
   const zone = order ? getOrderZone(order, currentDay) : null;
   const progress = order && order.processingTotal > 0
     ? ((order.processingTotal - order.processingRemaining) / order.processingTotal) * 100
@@ -43,10 +44,13 @@ export function MachineCard({ machine, order, currentDay, onCapacityChange }: Ma
   return (
     <div
       className={`rounded-lg border p-2.5 transition-all duration-300 min-h-[72px] ${
+        isBrokenDown ? 'border-destructive bg-destructive/10' :
         isIdle ? 'border-border/60 bg-muted/20' : ''
       }`}
       style={
-        isIdle
+        isBrokenDown
+          ? { borderColor: 'hsl(0 72% 51%)', background: 'hsl(0 72% 51% / 0.1)' }
+          : isIdle
           ? { borderColor: 'hsl(var(--border) / 0.4)', background: 'hsl(var(--muted) / 0.08)' }
           : zone
           ? {
@@ -59,17 +63,26 @@ export function MachineCard({ machine, order, currentDay, onCapacityChange }: Ma
       {/* Machine header */}
       <div className="flex items-center justify-between mb-1.5">
         <div className="flex items-center gap-1.5">
-          <Cog
-            className={`w-3 h-3 flex-shrink-0 ${
-              isIdle ? 'text-muted-foreground' : 'animate-spin'
-            }`}
-            style={
-              !isIdle && zone
-                ? { color: ZONE_COLORS[zone], animationDuration: '2s' }
-                : undefined
-            }
-          />
+          {isBrokenDown ? (
+            <Wrench className="w-3 h-3 flex-shrink-0 text-destructive" />
+          ) : (
+            <Cog
+              className={`w-3 h-3 flex-shrink-0 ${
+                isIdle ? 'text-muted-foreground' : 'animate-spin'
+              }`}
+              style={
+                !isIdle && zone
+                  ? { color: ZONE_COLORS[zone], animationDuration: '2s' }
+                  : undefined
+              }
+            />
+          )}
           <span className="text-[11px] font-medium text-foreground">{machine.name}</span>
+          {isBrokenDown && (
+            <span className="text-[9px] font-medium text-destructive bg-destructive/10 rounded px-1 py-0.5">
+              ⚠️ Поломка
+            </span>
+          )}
         </div>
         {editing ? (
           <input
@@ -100,7 +113,18 @@ export function MachineCard({ machine, order, currentDay, onCapacityChange }: Ma
         )}
       </div>
 
-      {order ? (
+      {isBrokenDown ? (
+        <div>
+          <p className="text-[10px] text-destructive font-medium">
+            Ремонт: {formatTime(machine.breakdownRemainingHours)}
+          </p>
+          {order && (
+            <p className="text-[9px] text-muted-foreground mt-0.5">
+              {order.number} — ожидает
+            </p>
+          )}
+        </div>
+      ) : order ? (
         <div>
           <div className="flex items-center justify-between gap-1">
             <span

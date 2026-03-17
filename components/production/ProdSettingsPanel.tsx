@@ -5,7 +5,7 @@ import type { ProdConfig, MachineConfig } from './types';
 import { DEFAULT_PROD_CONFIG, PROD_PROFILES } from './types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Settings, RotateCcw, Check, X, Factory, ClipboardList, Zap, Plus, Trash2, Shield, Link2, CalendarClock, Banknote, Activity } from 'lucide-react';
+import { Settings, RotateCcw, Check, X, Factory, ClipboardList, Zap, Plus, Trash2, Shield, Link2, CalendarClock, Banknote, Activity, Wrench } from 'lucide-react';
 
 interface ProdSettingsPanelProps {
   currentConfig: ProdConfig;
@@ -317,6 +317,26 @@ export function ProdSettingsPanel({ currentConfig, isRunning, onApply, onClose }
                     />
                     <span className="text-xs text-muted-foreground w-8 text-right tabular-nums">
                       {Math.round(config.processingVariability * 100)}%
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1.5">
+                    <Wrench className="w-3 h-3" />
+                    Доступность оборуд.
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="range"
+                      min={80}
+                      max={100}
+                      step={1}
+                      value={Math.round(config.machineAvailability * 100)}
+                      onChange={(e) => setConfig((prev) => ({ ...prev, machineAvailability: parseInt(e.target.value) / 100 }))}
+                      className="w-20 h-1.5 bg-muted rounded-full appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary"
+                    />
+                    <span className="text-xs text-muted-foreground w-8 text-right tabular-nums">
+                      {Math.round(config.machineAvailability * 100)}%
                     </span>
                   </div>
                 </div>

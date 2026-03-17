@@ -202,9 +202,44 @@ export function useProductionSim() {
         });
       }
 
-      /* ── Step 2: Advance processing on machines (1 hour per tick) ── */
+      /* ── Step 2: Handle machine breakdowns and repairs ── */
+      const machineAvailability = cfg.machineAvailability;
+      for (const machine of machines) {
+        if (machine.isBrokenDown) {
+          // Machine is broken — decrement repair time
+          machine.breakdownRemainingHours--;
+          if (machine.breakdownRemainingHours <= 0) {
+            // Repair complete
+            machine.isBrokenDown = false;
+            machine.breakdownRemainingHours = 0;
+            newLog.push({
+              id: `log-${++_logId}`,
+              day: newHour,
+              message: `🔧 ${machine.name} — ремонт завершён`,
+              type: 'repair',
+            });
+          }
+        } else if (!machine.currentOrderId) {
+          // Machine is idle and not broken — check for random breakdown
+          if (Math.random() > machineAvailability) {
+            // Breakdown occurs!
+            machine.isBrokenDown = true;
+            machine.breakdownRemainingHours = Math.ceil(Math.random() * 8); // 1-8 hours
+            newLog.push({
+              id: `log-${++_logId}`,
+              day: newHour,
+              message: `⚠️ ${machine.name} — поломка! Ремонт: ${formatTime(machine.breakdownRemainingHours)}`,
+              type: 'breakdown',
+            });
+          }
+        }
+      }
+
+      /* ── Step 3: Advance processing on machines (1 hour per tick) ── */
       for (const machine of machines) {
         if (!machine.currentOrderId) continue;
+        // Skip processing if machine is broken — order is paused, not lost
+        if (machine.isBrokenDown) continue;
         const order = findOrder(machine.currentOrderId);
         if (!order) { machine.currentOrderId = null; continue; }
 
@@ -242,11 +277,12 @@ export function useProductionSim() {
         }
       }
 
-      /* ── Step 3: Assign orders to idle machines (priority by buffer penetration) ── */
+      /* ── Step 4: Assign orders to idle machines (priority by buffer penetration) ── */
       for (const opId of [2, 1, 3]) {
         // Process constraint (Op2) first, then others
+        // Skip machines that are broken down or already processing
         const opMachines = machines.filter(
-          (m) => m.operationId === opId && m.currentOrderId === null
+          (m) => m.operationId === opId && m.currentOrderId === null && !m.isBrokenDown
         );
         if (opMachines.length === 0) continue;
 
@@ -332,14 +368,14 @@ export function useProductionSim() {
         }
       }
 
-      /* ── Step 4: Track idle time for machines (1 hour per tick) ── */
+      /* ── Step 5: Track idle time for machines (1 hour per tick) ── */
       for (const machine of machines) {
         if (!machine.currentOrderId) {
           machine.idleHours++;
         }
       }
 
-      /* ── Step 5: Ship finished orders that are due ── */
+      /* ── Step 6: Ship finished orders that are due ── */
       for (const order of orders) {
         if (order.status !== 'finished') continue;
 
@@ -437,7 +473,13 @@ export function useProductionSim() {
       const mergedMachines = newMachines.map((nm) => {
         const old = oldMap.get(nm.id);
         if (old) {
-          return { ...nm, currentOrderId: old.currentOrderId, idleHours: old.idleHours };
+          return {
+            ...nm,
+            currentOrderId: old.currentOrderId,
+            idleHours: old.idleHours,
+            isBrokenDown: old.isBrokenDown,
+            breakdownRemainingHours: old.breakdownRemainingHours,
+          };
         }
         return nm;
       });
