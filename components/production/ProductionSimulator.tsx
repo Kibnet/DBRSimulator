@@ -111,8 +111,9 @@ export function ProductionSimulator() {
   const recentEvents = financialEvents.filter((e) => day - e.hour <= windowHours);
   const last30Spent = recentEvents.reduce((s, e) => s + e.spent, 0);
   const last30NetEarned = recentEvents.reduce((s, e) => s + (e.earned - e.penalty), 0);
-  const daysElapsed = Math.max(1, Math.min(30, day / HOURS_PER_DAY));
-  const profitRatePerDay = Math.round((last30NetEarned - last30Spent) / daysElapsed);
+  const daysElapsed = Math.min(30, day / HOURS_PER_DAY);
+  const hasFullDay = day >= HOURS_PER_DAY;
+  const profitRatePerDay = hasFullDay ? Math.round((last30NetEarned - last30Spent) / daysElapsed) : null;
 
   return (
     <div className="min-h-screen bg-background bg-dot-grid">
@@ -399,9 +400,9 @@ export function ProductionSimulator() {
                 <StatRow label="Заработано (30д)" value={formatMoney(last30NetEarned)} primary={last30NetEarned > 0} />
                 <StatRow
                   label="Прибыль/день (30д)"
-                  value={`${profitRatePerDay >= 0 ? '+' : ''}${formatMoney(profitRatePerDay)}`}
-                  primary={profitRatePerDay > 0}
-                  danger={profitRatePerDay < 0}
+                  value={profitRatePerDay !== null ? `${profitRatePerDay >= 0 ? '+' : ''}${formatMoney(profitRatePerDay)}` : '—'}
+                  primary={profitRatePerDay !== null && profitRatePerDay > 0}
+                  danger={profitRatePerDay !== null && profitRatePerDay < 0}
                 />
                 <div className="border-t border-border my-1" />
                 <StatRow label="Штрафы за опоздание" value={formatMoney(stats.totalLateLoss)} danger={stats.totalLateLoss > 0} />
