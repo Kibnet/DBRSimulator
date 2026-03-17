@@ -304,7 +304,7 @@ export function useProductionSim() {
       for (const order of orders) {
         if (order.status !== 'finished') continue;
 
-        // Ship if due now or overdue
+        // Only ship when due date has arrived (no early shipping)
         if (newHour >= order.dueDay) {
           const wasLate = newHour > order.dueDay;
           order.status = 'shipped';
@@ -319,10 +319,6 @@ export function useProductionSim() {
             const hoursLate = newHour - order.dueDay;
             lateLoss = Math.round(revenue * 0.01 * hoursLate);
             stats.totalLateLoss += lateLoss;
-          }
-          financialEvents.push({ hour: newHour, spent: 0, earned: revenue - lateLoss });
-
-          if (wasLate) {
             stats.shippedLate++;
             newLog.push({
               id: `log-${++_logId}`,
@@ -339,28 +335,7 @@ export function useProductionSim() {
               type: 'ship',
             });
           }
-        }
-      }
-
-      /* ── Step 5b: Also ship finished orders that are ready early (1 day before due) ── */
-      for (const order of orders) {
-        if (order.status !== 'finished') continue;
-        if (newHour >= order.dueDay - HOURS_PER_DAY) {
-          order.status = 'shipped';
-          stats.totalShipped++;
-          stats.shippedOnTime++;
-
-          // Financial: earned from early shipment (full price)
-          const revenue = order.quantity * cfg.unitPriceSell;
-          stats.totalEarned += revenue;
-          financialEvents.push({ hour: newHour, spent: 0, earned: revenue });
-
-          newLog.push({
-            id: `log-${++_logId}`,
-            day: newHour,
-            message: `📦 ${order.number} — отгружен досрочно`,
-            type: 'ship',
-          });
+          financialEvents.push({ hour: newHour, spent: 0, earned: revenue - lateLoss });
         }
       }
 
